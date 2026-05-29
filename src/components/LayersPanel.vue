@@ -35,7 +35,6 @@ const regionsLayer = inject('regionsLayer')
 
 const layers = ref([])
 
-// Ждём пока слои появятся (они создаются в onMounted MapView)
 watch(
   [baseLayer, regionsLayer],
   ([base, regions]) => {

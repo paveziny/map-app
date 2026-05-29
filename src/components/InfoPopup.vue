@@ -24,15 +24,12 @@ const population = ref(null)
 let overlay = null
 let clickHandler = null
 
-// Форматируем число: 1234567 → "1 234 567"
 const formattedPopulation = computed(() => {
   if (population.value == null) return '—'
   return population.value.toLocaleString('ru-RU')
 })
 
 onMounted(() => {
-  // setInterval — ждём пока карта и слой будут готовы
-  // (они появляются в onMounted MapView, после fetch)
   const checkMap = setInterval(() => {
     if (map.value && regionsLayer.value && popupRef.value) {
       clearInterval(checkMap)
@@ -46,11 +43,10 @@ function initPopup() {
     element: popupRef.value,
     positioning: 'bottom-center',
     offset: [0, -10],
-    stopEvent: true, // клики по попапу не пробрасываются в карту
+    stopEvent: true,
   })
   map.value.addOverlay(overlay)
 
-  // Один обработчик на всю карту — эффективнее чем на каждую фичу
   clickHandler = (event) => {
     let foundFeature = null
 

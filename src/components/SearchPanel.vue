@@ -10,7 +10,6 @@
       prepend-inner-icon="mdi-magnify"
     />
 
-    <!-- Список результатов -->
     <div v-if="results.length" class="results-list">
       <div v-for="(item, idx) in results" :key="idx" class="result-item" @click="goToRegion(item)">
         <span class="result-name">{{ item.get('region') }}</span>
@@ -18,7 +17,6 @@
       </div>
     </div>
 
-    <!-- Ничего не найдено -->
     <div v-else-if="query && query.length > 0 && !results.length" class="no-results">
       Ничего не найдено
     </div>
@@ -36,10 +34,7 @@ const query = ref('')
 const results = ref([])
 let highlightedFeature = null
 
-// --- Функция поиска ---
-// Вынесена отдельно, чтобы вызывать из двух watch
 function doSearch(q) {
-  // Если строка пустая или source ещё не готов — сбрасываем
   if (!q || !q.trim() || !regionsSource.value) {
     results.value = []
     return
@@ -48,7 +43,6 @@ function doSearch(q) {
   const lower = q.toLowerCase().trim()
   const features = regionsSource.value.getFeatures()
 
-  // Диагностический лог — убери после проверки
   console.log('[Search] всего фич в source:', features.length)
   if (features.length > 0) {
     console.log('[Search] props первой фичи:', features[0].getProperties())
@@ -64,21 +58,16 @@ function doSearch(q) {
   console.log('[Search] найдено:', results.value.length)
 }
 
-// Реагируем на изменение строки поиска
 watch(query, (newQuery) => {
   doSearch(newQuery)
 })
 
-// Реагируем на появление source:
-// GeoJSON грузится асинхронно — если юзер ввёл запрос ДО загрузки,
-// этот watch повторит поиск как только фичи появятся
 watch(regionsSource, (src) => {
   if (src && query.value) {
     doSearch(query.value)
   }
 })
 
-// --- Переход к региону ---
 function goToRegion(feature) {
   if (!map.value || !feature) return
 
@@ -95,7 +84,6 @@ function goToRegion(feature) {
   }
 }
 
-// --- Подсветка региона ---
 function highlightFeature(feature) {
   const name = feature.get('region') || ''
 
@@ -116,8 +104,6 @@ function highlightFeature(feature) {
   highlightedFeature = feature
 }
 
-// --- Сброс подсветки ---
-// setStyle(undefined) возвращает фиче стиль слоя (без надобности хранить оригинал)
 function clearHighlight() {
   if (highlightedFeature) {
     highlightedFeature.setStyle(undefined)

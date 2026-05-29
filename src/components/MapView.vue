@@ -1,19 +1,15 @@
 <template>
   <div class="map-wrapper">
-    <!-- Контейнер карты -->
     <div ref="mapContainer" class="map-container"></div>
 
-    <!-- Дочерние компоненты — inject найдёт provide отсюда -->
     <SearchPanel />
     <LayersPanel />
     <InfoPopup />
 
-    <!-- Индикатор загрузки -->
     <div v-if="isLoading" class="loading-overlay">
       <v-progress-circular indeterminate color="primary" size="48" />
     </div>
 
-    <!-- Сообщение об ошибке -->
     <div v-if="errorMessage" class="error-message">
       {{ errorMessage }}
     </div>
@@ -38,7 +34,6 @@ import SearchPanel from '@/components/SearchPanel.vue'
 import LayersPanel from '@/components/LayersPanel.vue'
 import InfoPopup from '@/components/InfoPopup.vue'
 
-// --- refs для карты и слоёв ---
 const mapContainer = ref(null)
 const isLoading = ref(false)
 const errorMessage = ref('')
@@ -48,47 +43,86 @@ const baseLayerRef = ref(null)
 const regionsLayerRef = ref(null)
 const regionsSourceRef = ref(null)
 
-// --- provide вызываем ДО onMounted ---
-// Дочерние компоненты проходят setup() раньше onMounted родителя.
-// Поэтому provide должен быть здесь — тогда inject в детях найдёт ключи.
-// Внутри ref пока null, но когда onMounted запишет .value — дети увидят изменение.
 provide('map', mapRef)
 provide('baseLayer', baseLayerRef)
 provide('regionsLayer', regionsLayerRef)
 provide('regionsSource', regionsSourceRef)
 
-// Простые переменные (не ref) — используются только в функции стиля OL
 let minValue = 0
 let maxValue = 15000000
 
-// --- Функция стиля для регионов ---
 function regionStyleFunction(feature, resolution) {
   const props = feature.getProperties()
   const value = Number(props.population) || 0
   const fillColor = getColorByValue(value, minValue, maxValue)
   const name = props.region || ''
 
-  return new Style({
+  const baseStyle = new Style({
     fill: new Fill({ color: fillColor }),
     stroke: new Stroke({ color: '#555', width: 1 }),
-    text: new Text({
-      // Подпись только при достаточном приближении
-      text: resolution < 5000 ? name : '',
-      font: '12px Roboto, sans-serif',
-      fill: new Fill({ color: '#111' }),
-      stroke: new Stroke({ color: '#fff', width: 3 }),
-      overflow: true,
-    }),
   })
+
+  if (resolution > 5000) {
+    return baseStyle
+  }
+
+  const geometry = feature.getGeometry()
+  if (!geometry) return baseStyle
+
+  const geometryType = geometry.getType()
+
+  if (geometryType === 'Polygon') {
+    return new Style({
+      fill: new Fill({ color: fillColor }),
+      stroke: new Stroke({ color: '#555', width: 1 }),
+      text: new Text({
+        text: name,
+        font: '12px Roboto, sans-serif',
+        fill: new Fill({ color: '#111' }),
+        stroke: new Stroke({ color: '#fff', width: 3 }),
+        overflow: true,
+      }),
+    })
+  }
+
+  if (geometryType === 'MultiPolygon') {
+    const polygons = geometry.getPolygons()
+
+    let largestPolygon = null
+    let largestArea = 0
+
+    polygons.forEach((polygon) => {
+      const area = polygon.getArea()
+      if (area > largestArea) {
+        largestArea = area
+        largestPolygon = polygon
+      }
+    })
+
+    if (!largestPolygon) return baseStyle
+
+    return [
+      baseStyle,
+      new Style({
+        geometry: largestPolygon.getInteriorPoint(),
+        text: new Text({
+          text: name,
+          font: '12px Roboto, sans-serif',
+          fill: new Fill({ color: '#111' }),
+          stroke: new Stroke({ color: '#fff', width: 3 }),
+          overflow: true,
+        }),
+      }),
+    ]
+  }
+
+  return baseStyle
 }
 
-// URL спутниковых тайлов Google.
-// OL-плейсхолдеры: {x}{y}{z} — координаты тайла, {0-3} — субдомены mt0..mt3
 const googleSatelliteUrl =
   'https://mt{0-3}.google.com/vt/lyrs=s&hl=ru&gl=ru&x={x}&y={y}&z={z}&s=Galileo'
 
 onMounted(async () => {
-  // 1. Базовый слой — спутник Google
   const googleLayer = new TileLayer({
     source: new XYZ({
       url: googleSatelliteUrl,
@@ -97,7 +131,6 @@ onMounted(async () => {
     properties: { title: 'Google Satellite', baseLayer: true },
   })
 
-  // 2. Векторный слой регионов
   const regionsSource = new VectorSource()
   const regionsLayer = new VectorLayer({
     source: regionsSource,
@@ -105,24 +138,21 @@ onMounted(async () => {
     properties: { title: 'Регионы РФ' },
   })
 
-  // 3. Карта
   const map = new Map({
     target: mapContainer.value,
     layers: [googleLayer, regionsLayer],
     view: new View({
-      center: fromLonLat([90, 65]), // центр РФ
+      center: fromLonLat([90, 65]),
       zoom: 3,
     }),
-    controls: defaultControls({ zoom: false }), // убираем кнопки +/-
+    controls: defaultControls({ zoom: false }),
   })
 
-  // 4. Записываем в ref — дочерние компоненты увидят изменение через inject
   mapRef.value = map
   baseLayerRef.value = googleLayer
   regionsLayerRef.value = regionsLayer
   regionsSourceRef.value = regionsSource
 
-  // 5. Загружаем GeoJSON
   await loadRegions(regionsSource)
 })
 
@@ -136,7 +166,6 @@ async function loadRegions(source) {
       throw new Error(`Файл не найден: ${response.status}`)
     }
 
-    // Читаем сначала как текст — чтобы поймать HTML-заглушку вместо JSON
     const text = await response.text()
     if (text.trimStart().startsWith('<')) {
       throw new Error('Сервер вернул HTML вместо JSON — проверь путь к файлу в public/data/')
@@ -150,11 +179,10 @@ async function loadRegions(source) {
     }
 
     const features = new GeoJSON().readFeatures(data, {
-      dataProjection: 'EPSG:4326', // в файле — градусы (lon/lat)
-      featureProjection: 'EPSG:3857', // OL рисует в метрах Web Mercator
+      dataProjection: 'EPSG:4326',
+      featureProjection: 'EPSG:3857',
     })
 
-    // Считаем реальные min/max по population для точной цветовой шкалы
     const populations = features
       .map((f) => Number(f.get('population')))
       .filter((v) => !Number.isNaN(v) && v > 0)
