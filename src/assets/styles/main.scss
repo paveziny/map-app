@@ -1,0 +1,19 @@
+@use './variable' as *;
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: 'Roboto', sans-serif;
+  color: $color-text;
+}
+
+%panel-style {
+  background: $color-bg;
+  padding: $panel-padding;
+  border-radius: $panel-radius;
+  box-shadow: $panel-shadow;
+}
