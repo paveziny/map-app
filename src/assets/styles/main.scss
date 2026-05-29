@@ -1,19 +1,18 @@
-@use './variables' as *;
+@use 'variables' as *;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 html,
 body,
 #app {
-  margin: 0;
-  padding: 0;
-  height: 100%;
   width: 100%;
-  font-family: 'Roboto', sans-serif;
-  color: $color-text;
-}
-
-%panel-style {
-  background: $color-bg;
-  padding: $panel-padding;
-  border-radius: $panel-radius;
-  box-shadow: $panel-shadow;
+  height: 100%;
+  overflow: hidden;
+  font-family: Roboto, sans-serif;
 }

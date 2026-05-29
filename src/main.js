@@ -11,7 +11,7 @@ import '@mdi/font/css/materialdesignicons.css'
 // OpenLayers стили
 import 'ol/ol.css'
 
-// Наши глобальные стили
+// Глобальные стили
 import './assets/styles/main.scss'
 
 const vuetify = createVuetify({
