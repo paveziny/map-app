@@ -79,6 +79,9 @@ function updateOpacity(layer, value) {
   right: 16px;
   width: 280px;
   background: $color-bg;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   padding: $panel-padding;
   border-radius: $panel-radius;
   box-shadow: $panel-shadow;
@@ -86,8 +89,9 @@ function updateOpacity(layer, value) {
 }
 
 .panel-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
   margin-bottom: 12px;
 }
 
@@ -95,7 +99,7 @@ function updateOpacity(layer, value) {
   padding: 8px 0;
 
   & + & {
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
   }
 }
 
@@ -108,14 +112,21 @@ function updateOpacity(layer, value) {
 
 .visibility-toggle {
   cursor: pointer;
-  color: #555;
+  color: #6b7280;
+
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
 
   &:hover {
     color: $color-primary;
+    transform: scale(1.08s);
   }
 }
 
 .layer-title {
   font-size: 14px;
+  font-weight: 500;
+  color: $color-text;
 }
 </style>

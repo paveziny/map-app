@@ -16,5 +16,7 @@ import MapView from '@/components/MapView.vue'
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+
+  background: #eef2f7;
 }
 </style>
