@@ -126,7 +126,6 @@ onMounted(async () => {
   const googleLayer = new TileLayer({
     source: new XYZ({
       url: googleSatelliteUrl,
-      attributions: '© Google Maps',
     }),
     properties: { title: 'Google Satellite', baseLayer: true },
   })
