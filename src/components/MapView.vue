@@ -66,7 +66,7 @@ function regionStyleFunction(feature, resolution) {
       : new Stroke({ color: '#555', width: 1 }),
   })
 
-  if (resolution > 5000) {
+  if (resolution > 8000) {
     return baseStyle
   }
 
