@@ -26,19 +26,14 @@
 
 <script setup>
 import { ref, watch, inject } from 'vue'
-import { Style, Fill, Stroke, Text } from 'ol/style'
-import VectorLayer from 'ol/layer/Vector'
-import VectorSource from 'ol/source/Vector'
 
 const map = inject('map')
 const regionsSource = inject('regionsSource')
-const regionsLayer = inject('regionsLayer')
+const highlightFeature = inject('highlightFeature')
+const clearHighlight = inject('clearHighlight')
 
 const query = ref('')
 const results = ref([])
-
-let highlightLayer = null
-let highlightedFeature = null
 
 function doSearch(q) {
   if (!q || !q.trim() || !regionsSource.value) {
@@ -94,93 +89,6 @@ function goToRegion(feature) {
     })
   }
 }
-
-function highlightFeature(feature) {
-  const name = feature.get('region') || ''
-
-  feature.set('_hideText', true)
-  feature.set('_hideFill', true)
-
-  if (regionsLayer.value) {
-    regionsLayer.value.changed()
-  }
-
-  if (!highlightLayer) {
-    highlightLayer = new VectorLayer({
-      source: new VectorSource(),
-      style: null,
-      properties: { title: 'Выделение' },
-      renderBuffer: 300,
-    })
-    map.value.addLayer(highlightLayer)
-  }
-
-  const clone = feature.clone()
-  highlightLayer.getSource().clear()
-  highlightLayer.getSource().addFeature(clone)
-
-  const geometry = feature.getGeometry()
-  if (!geometry) return
-
-  const geometryType = geometry.getType()
-
-  const baseHighlightStyle = new Style({
-    stroke: new Stroke({
-      color: '#d97706',
-      width: 3,
-    }),
-    fill: new Fill({ color: 'rgba(245, 158, 11, 0.12)' }),
-  })
-
-  const textStyle = new Style({
-    text: new Text({
-      text: name,
-      font: '600 14px Inter, Roboto, sans-serif',
-      fill: new Fill({ color: '#ffffff' }),
-      stroke: new Stroke({ color: 'rgba(0, 0, 0, 0.5)', width: 2 }),
-      overflow: true,
-    }),
-  })
-
-  if (geometryType === 'Polygon') {
-    textStyle.setGeometry(geometry.getInteriorPoint())
-  }
-
-  if (geometryType === 'MultiPolygon') {
-    const polygons = geometry.getPolygons()
-    let largestPolygon = null
-    let largestArea = 0
-
-    polygons.forEach((polygon) => {
-      const area = polygon.getArea()
-      if (area > largestArea) {
-        largestArea = area
-        largestPolygon = polygon
-      }
-    })
-
-    if (largestPolygon) {
-      textStyle.setGeometry(largestPolygon.getInteriorPoint())
-    }
-  }
-
-  highlightLayer.setStyle([baseHighlightStyle, textStyle])
-
-  highlightedFeature = feature
-}
-function clearHighlight() {
-  if (highlightLayer) {
-    highlightLayer.getSource().clear()
-  }
-  if (highlightedFeature) {
-    highlightedFeature.set('_hideText', false)
-    highlightedFeature.set('_hideFill', false)
-    highlightedFeature = null
-    if (regionsLayer.value) {
-      regionsLayer.value.changed()
-    }
-  }
-}
 </script>
 
 <style lang="scss" scoped>
@@ -191,14 +99,12 @@ function clearHighlight() {
   top: 16px;
   left: 16px;
   width: 320px;
-  background: rgba(255, 255, 255, 0.85);
+  background: $color-bg;
   backdrop-filter: blur(12px);
   padding: $panel-padding;
-  border-radius: 20px;
+  border-radius: $panel-radius;
   border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.04),
-    0 1px 4px rgba(0, 0, 0, 0.02);
+  box-shadow: $panel-shadow;
   z-index: $z-panel;
 }
 

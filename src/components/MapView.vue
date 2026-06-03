@@ -33,6 +33,7 @@ import { getColorByValue } from '@/utils/colorScale'
 import SearchPanel from '@/components/SearchPanel.vue'
 import LayersPanel from '@/components/LayersPanel.vue'
 import InfoPopup from '@/components/InfoPopup.vue'
+import { useHighlight } from '@/composables/useHighlight'
 
 const mapContainer = ref(null)
 const isLoading = ref(false)
@@ -47,6 +48,11 @@ provide('map', mapRef)
 provide('baseLayer', baseLayerRef)
 provide('regionsLayer', regionsLayerRef)
 provide('regionsSource', regionsSourceRef)
+
+const highlight = useHighlight(mapRef, regionsLayerRef)
+
+provide('highlightFeature', highlight.highlightFeature)
+provide('clearHighlight', highlight.clearHighlight)
 
 let minValue = 0
 let maxValue = 15000000

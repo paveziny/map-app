@@ -1,11 +1,25 @@
 <template>
-  <div ref="popupRef" class="popup" v-show="visible">
-    <div class="popup-close" @click="close">×</div>
-    <div class="popup-title">{{ regionName }}</div>
-    <div class="popup-row">
-      <span class="label">Население:</span>
-      <span class="value">{{ formattedPopulation }}</span>
+  <div ref="popupRef" class="popup-wrapper" :class="{ 'popup-visible': visible }">
+    <div class="popup">
+      <div class="popup-bg"></div>
+
+      <div class="popup-content">
+        <div class="popup-close" @click="close">
+          <v-icon size="16">mdi-close</v-icon>
+        </div>
+
+        <div class="popup-title">{{ regionName }}</div>
+
+        <div class="popup-divider"></div>
+
+        <div class="popup-row">
+          <span class="label">Население</span>
+          <span class="value">{{ formattedPopulation }}</span>
+        </div>
+      </div>
     </div>
+
+    <div class="popup-arrow"></div>
   </div>
 </template>
 
@@ -15,6 +29,8 @@ import Overlay from 'ol/Overlay'
 
 const map = inject('map')
 const regionsLayer = inject('regionsLayer')
+const highlightFeature = inject('highlightFeature')
+const clearHighlight = inject('clearHighlight')
 
 const popupRef = ref(null)
 const visible = ref(false)
@@ -60,7 +76,16 @@ function initPopup() {
       regionName.value = foundFeature.get('region') || 'Без названия'
       population.value = Number(foundFeature.get('population')) || null
       overlay.setPosition(event.coordinate)
-      visible.value = true
+
+      if (clearHighlight) clearHighlight()
+      if (highlightFeature) highlightFeature(foundFeature)
+
+      visible.value = false
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          visible.value = true
+        })
+      })
     } else {
       close()
     }
@@ -71,7 +96,14 @@ function initPopup() {
 
 function close() {
   visible.value = false
-  if (overlay) overlay.setPosition(undefined)
+
+  if (clearHighlight) clearHighlight()
+
+  setTimeout(() => {
+    if (overlay && !visible.value) {
+      overlay.setPosition(undefined)
+    }
+  }, 200)
 }
 
 onBeforeUnmount(() => {
@@ -87,58 +119,126 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 @use '../assets/styles/variables' as *;
 
+.popup-wrapper {
+  position: relative;
+  z-index: $z-popup;
+  opacity: 0;
+  transform: translateY(8px) scale(0.95);
+  transition:
+    opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: drop-shadow(0 8px 24px rgba(15, 23, 42, 0.12))
+    drop-shadow(0 2px 8px rgba(15, 23, 42, 0.06));
+
+  &.popup-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  &:not(.popup-visible) {
+    transition:
+      opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
 .popup {
   position: relative;
-  background: $color-bg;
-  padding: $panel-padding;
   border-radius: $panel-radius;
-  box-shadow: $panel-shadow;
-  min-width: 200px;
-  z-index: $z-popup;
+  min-width: 220px;
+  max-width: 320px;
+  overflow: hidden;
+}
 
-  &::after {
-    content: '';
-    position: absolute;
-    bottom: -8px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-left: 8px solid transparent;
-    border-right: 8px solid transparent;
-    border-top: 8px solid $color-bg;
-  }
+.popup-bg {
+  position: absolute;
+  inset: 0;
+  background: $color-bg;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: $panel-radius;
+  z-index: 0;
+}
+
+.popup-content {
+  position: relative;
+  z-index: 1;
+  padding: $panel-padding;
+}
+
+.popup-arrow {
+  position: relative;
+  width: 0;
+  height: 0;
+  margin: 0 auto;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 10px solid $color-bg;
 }
 
 .popup-close {
   position: absolute;
-  top: 6px;
-  right: 10px;
-  font-size: 20px;
+  top: 10px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  color: #888;
-  line-height: 1;
+  color: #94a3b8;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  z-index: 2;
 
   &:hover {
-    color: #333;
+    color: #475569;
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  &:active {
+    background: rgba(0, 0, 0, 0.1);
+    transform: scale(0.9);
   }
 }
 
 .popup-title {
   font-size: 15px;
   font-weight: 600;
-  margin-bottom: 8px;
-  padding-right: 20px;
+  line-height: 1.4;
+  margin-bottom: 12px;
+  padding-right: 32px;
+  color: $color-text;
+  word-break: break-word;
+}
+
+.popup-divider {
+  height: 1px;
+  background: rgba(148, 163, 184, 0.25);
+  margin-bottom: 12px;
 }
 
 .popup-row {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  align-items: baseline;
+  gap: 16px;
 
   .label {
-    color: #666;
+    font-size: 13px;
+    color: #64748b;
+    flex-shrink: 0;
+    font-weight: 400;
   }
+
   .value {
-    font-weight: 500;
+    font-size: 18px;
+    font-weight: 700;
+    color: $color-text;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.3px;
   }
 }
 </style>
