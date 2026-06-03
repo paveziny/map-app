@@ -65,6 +65,11 @@ function doSearch(q) {
 }
 
 watch(query, (newQuery) => {
+  if (!newQuery || !newQuery.trim()) {
+    results.value = []
+    clearHighlight()
+    return
+  }
   doSearch(newQuery)
 })
 
@@ -114,26 +119,55 @@ function highlightFeature(feature) {
   highlightLayer.getSource().clear()
   highlightLayer.getSource().addFeature(clone)
 
-  highlightLayer.setStyle(
-    new Style({
-      stroke: new Stroke({
-        color: '#d97706',
-        width: 3,
-      }),
-      fill: new Fill({ color: 'rgba(245, 158, 11, 0.12)' }),
-      text: new Text({
-        text: name,
-        font: '600 14px Inter, Roboto, sans-serif',
-        fill: new Fill({ color: '#ffffff' }),
-        stroke: new Stroke({ color: 'rgba(0, 0, 0, 0.5)', width: 2 }),
-        overflow: true,
-      }),
+  const geometry = feature.getGeometry()
+  if (!geometry) return
+
+  const geometryType = geometry.getType()
+
+  const baseHighlightStyle = new Style({
+    stroke: new Stroke({
+      color: '#d97706',
+      width: 3,
     }),
-  )
+    fill: new Fill({ color: 'rgba(245, 158, 11, 0.12)' }),
+  })
+
+  const textStyle = new Style({
+    text: new Text({
+      text: name,
+      font: '600 14px Inter, Roboto, sans-serif',
+      fill: new Fill({ color: '#ffffff' }),
+      stroke: new Stroke({ color: 'rgba(0, 0, 0, 0.5)', width: 2 }),
+      overflow: true,
+    }),
+  })
+
+  if (geometryType === 'Polygon') {
+    textStyle.setGeometry(geometry.getInteriorPoint())
+  }
+
+  if (geometryType === 'MultiPolygon') {
+    const polygons = geometry.getPolygons()
+    let largestPolygon = null
+    let largestArea = 0
+
+    polygons.forEach((polygon) => {
+      const area = polygon.getArea()
+      if (area > largestArea) {
+        largestArea = area
+        largestPolygon = polygon
+      }
+    })
+
+    if (largestPolygon) {
+      textStyle.setGeometry(largestPolygon.getInteriorPoint())
+    }
+  }
+
+  highlightLayer.setStyle([baseHighlightStyle, textStyle])
 
   highlightedFeature = feature
 }
-
 function clearHighlight() {
   if (highlightLayer) {
     highlightLayer.getSource().clear()
