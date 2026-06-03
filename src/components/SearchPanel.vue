@@ -2,23 +2,24 @@
   <div class="search-panel">
     <v-text-field
       v-model="query"
-      label="Поиск региона"
+      placeholder="Поиск региона"
       variant="outlined"
       density="compact"
       hide-details
       clearable
       prepend-inner-icon="mdi-magnify"
+      class="search-input"
     />
 
     <div v-if="results.length" class="results-list">
       <div v-for="(item, idx) in results" :key="idx" class="result-item" @click="goToRegion(item)">
         <span class="result-name">{{ item.get('region') }}</span>
-        <v-icon size="small" color="primary">mdi-map-marker</v-icon>
+        <v-icon size="small" color="primary" class="result-icon">mdi-map-marker</v-icon>
       </div>
     </div>
 
-    <div v-else-if="query && query.length > 0 && !results.length" class="no-results">
-      Ничего не найдено
+    <div v-else-if="query && query.length > 0 && !results.length" class="no-results-wrapper">
+      <span class="no-results">Ничего не найдено</span>
     </div>
   </div>
 </template>
@@ -120,41 +121,165 @@ function clearHighlight() {
   top: 16px;
   left: 16px;
   width: 320px;
-  background: $color-bg;
-  padding: $panel-padding;
-  border-radius: $panel-radius;
-  box-shadow: $panel-shadow;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  padding: $panel-padding; // 16px
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.04),
+    0 1px 4px rgba(0, 0, 0, 0.02);
   z-index: $z-panel;
 }
 
+:deep(.search-input) {
+  .v-input__control {
+    margin: 0;
+  }
+
+  .v-field {
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: none;
+    transition: all 0.2s ease;
+    color: #1e293b;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.9);
+      border-color: rgba(0, 0, 0, 0.15);
+    }
+
+    &.v-field--focused {
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      border-color: $color-primary;
+    }
+  }
+
+  .v-icon {
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+
+  .v-field--focused .v-icon {
+    opacity: 0.8;
+  }
+}
+
 .results-list {
-  margin-top: 12px;
+  margin-top: 16px;
   max-height: 320px;
   overflow-y: auto;
+
+  padding: 4px 0;
+  margin-left: -4px;
+  margin-right: -4px;
+  padding-left: 4px;
+  padding-right: 4px;
+
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+
+  &:hover {
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+  }
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 8px 0;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 10px;
+    transition: background 0.3s ease;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+  }
 }
 
 .result-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 10px 12px;
+  margin-bottom: 2px;
   cursor: pointer;
-  border-radius: 8px;
-  transition: background 0.15s;
+  border-radius: 10px;
+  transition: all 0.15s ease;
+  color: #334155;
+  position: relative;
 
   &:hover {
-    background: rgba(25, 118, 210, 0.08);
+    background: rgba(37, 99, 235, 0.06);
+
+    .result-name {
+      color: #1e293b;
+    }
+
+    .result-icon {
+      opacity: 1;
+      transform: translateX(2px);
+    }
+  }
+
+  &:active {
+    background: rgba(37, 99, 235, 0.12);
+    transform: scale(0.995);
+  }
+
+  &:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 12px;
+    right: 12px;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.04);
+  }
+
+  &:hover:not(:last-child)::after {
+    background: transparent;
   }
 }
 
 .result-name {
   font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 12px;
+  transition: color 0.15s ease;
+}
+
+.result-icon {
+  opacity: 0.4;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.no-results-wrapper {
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(241, 245, 249, 0.6);
+  border-radius: 12px;
+  text-align: center;
 }
 
 .no-results {
-  margin-top: 12px;
   font-size: 13px;
-  color: #888;
-  padding: 8px 12px;
+  color: #64748b;
+  font-weight: 400;
 }
 </style>
