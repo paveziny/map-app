@@ -56,10 +56,14 @@ function regionStyleFunction(feature, resolution) {
   const value = Number(props.population) || 0
   const fillColor = getColorByValue(value, minValue, maxValue)
   const name = props.region || ''
+  const hideText = props._hideText || false
+  const hideFill = props._hideFill || false
 
   const baseStyle = new Style({
-    fill: new Fill({ color: fillColor }),
-    stroke: new Stroke({ color: '#555', width: 1 }),
+    fill: hideFill ? new Fill({ color: 'rgba(255, 255, 255, 0)' }) : new Fill({ color: fillColor }),
+    stroke: hideFill
+      ? new Stroke({ color: 'transparent', width: 0 })
+      : new Stroke({ color: '#555', width: 1 }),
   })
 
   if (resolution > 5000) {
@@ -71,23 +75,28 @@ function regionStyleFunction(feature, resolution) {
 
   const geometryType = geometry.getType()
 
+  const textStyle = new Text({
+    text: hideText ? '' : name,
+    font: '500 13px Inter, Roboto, sans-serif',
+    fill: new Fill({ color: '#ffffff' }),
+    stroke: new Stroke({ color: 'rgba(0, 0, 0, 0.5)', width: 2 }),
+    overflow: true,
+  })
+
   if (geometryType === 'Polygon') {
     return new Style({
-      fill: new Fill({ color: fillColor }),
-      stroke: new Stroke({ color: '#555', width: 1 }),
-      text: new Text({
-        text: name,
-        font: '12px Roboto, sans-serif',
-        fill: new Fill({ color: '#111' }),
-        stroke: new Stroke({ color: '#fff', width: 3 }),
-        overflow: true,
-      }),
+      fill: hideFill
+        ? new Fill({ color: 'rgba(255, 255, 255, 0)' })
+        : new Fill({ color: fillColor }),
+      stroke: hideFill
+        ? new Stroke({ color: 'transparent', width: 0 })
+        : new Stroke({ color: '#555', width: 1 }),
+      text: textStyle,
     })
   }
 
   if (geometryType === 'MultiPolygon') {
     const polygons = geometry.getPolygons()
-
     let largestPolygon = null
     let largestArea = 0
 
@@ -105,13 +114,7 @@ function regionStyleFunction(feature, resolution) {
       baseStyle,
       new Style({
         geometry: largestPolygon.getInteriorPoint(),
-        text: new Text({
-          text: name,
-          font: '12px Roboto, sans-serif',
-          fill: new Fill({ color: '#111' }),
-          stroke: new Stroke({ color: '#fff', width: 3 }),
-          overflow: true,
-        }),
+        text: textStyle,
       }),
     ]
   }

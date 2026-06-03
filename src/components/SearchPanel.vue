@@ -27,12 +27,17 @@
 <script setup>
 import { ref, watch, inject } from 'vue'
 import { Style, Fill, Stroke, Text } from 'ol/style'
+import VectorLayer from 'ol/layer/Vector'
+import VectorSource from 'ol/source/Vector'
 
 const map = inject('map')
 const regionsSource = inject('regionsSource')
+const regionsLayer = inject('regionsLayer')
 
 const query = ref('')
 const results = ref([])
+
+let highlightLayer = null
 let highlightedFeature = null
 
 function doSearch(q) {
@@ -78,9 +83,9 @@ function goToRegion(feature) {
   const geometry = feature.getGeometry()
   if (geometry) {
     map.value.getView().fit(geometry.getExtent(), {
-      padding: [80, 80, 80, 80],
+      padding: [100, 100, 100, 100],
       duration: 600,
-      maxZoom: 8,
+      maxZoom: 7,
     })
   }
 }
@@ -88,15 +93,39 @@ function goToRegion(feature) {
 function highlightFeature(feature) {
   const name = feature.get('region') || ''
 
-  feature.setStyle(
+  feature.set('_hideText', true)
+  feature.set('_hideFill', true)
+
+  if (regionsLayer.value) {
+    regionsLayer.value.changed()
+  }
+
+  if (!highlightLayer) {
+    highlightLayer = new VectorLayer({
+      source: new VectorSource(),
+      style: null,
+      properties: { title: 'Выделение' },
+      renderBuffer: 300,
+    })
+    map.value.addLayer(highlightLayer)
+  }
+
+  const clone = feature.clone()
+  highlightLayer.getSource().clear()
+  highlightLayer.getSource().addFeature(clone)
+
+  highlightLayer.setStyle(
     new Style({
-      fill: new Fill({ color: 'rgba(255, 235, 59, 0.5)' }),
-      stroke: new Stroke({ color: '#ff6f00', width: 3 }),
+      stroke: new Stroke({
+        color: '#d97706',
+        width: 3,
+      }),
+      fill: new Fill({ color: 'rgba(245, 158, 11, 0.12)' }),
       text: new Text({
         text: name,
-        font: 'bold 14px Roboto, sans-serif',
-        fill: new Fill({ color: '#111' }),
-        stroke: new Stroke({ color: '#fff', width: 3 }),
+        font: '600 14px Inter, Roboto, sans-serif',
+        fill: new Fill({ color: '#ffffff' }),
+        stroke: new Stroke({ color: 'rgba(0, 0, 0, 0.5)', width: 2 }),
         overflow: true,
       }),
     }),
@@ -106,9 +135,16 @@ function highlightFeature(feature) {
 }
 
 function clearHighlight() {
+  if (highlightLayer) {
+    highlightLayer.getSource().clear()
+  }
   if (highlightedFeature) {
-    highlightedFeature.setStyle(undefined)
+    highlightedFeature.set('_hideText', false)
+    highlightedFeature.set('_hideFill', false)
     highlightedFeature = null
+    if (regionsLayer.value) {
+      regionsLayer.value.changed()
+    }
   }
 }
 </script>
@@ -123,7 +159,7 @@ function clearHighlight() {
   width: 320px;
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
-  padding: $panel-padding; // 16px
+  padding: $panel-padding;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow:
@@ -154,6 +190,12 @@ function clearHighlight() {
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
       border-color: $color-primary;
     }
+  }
+
+  .v-field__input::placeholder {
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 14px;
+    opacity: 1;
   }
 
   .v-icon {
