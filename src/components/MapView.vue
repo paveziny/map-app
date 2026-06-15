@@ -4,7 +4,7 @@
 
     <SearchPanel />
     <LayersPanel />
-    <InfoPopup />
+    <InfoPopup ref="infoPopupRef" />
 
     <div v-if="isLoading" class="loading-overlay">
       <v-progress-circular indeterminate color="primary" size="48" />
@@ -29,11 +29,11 @@ import { Style, Fill, Stroke, Text } from 'ol/style'
 import { fromLonLat } from 'ol/proj'
 import { defaults as defaultControls } from 'ol/control'
 import { getColorByValue } from '@/utils/colorScale'
+import { useHighlight } from '@/composables/useHighlight'
 
 import SearchPanel from '@/components/SearchPanel.vue'
 import LayersPanel from '@/components/LayersPanel.vue'
 import InfoPopup from '@/components/InfoPopup.vue'
-import { useHighlight } from '@/composables/useHighlight'
 
 const mapContainer = ref(null)
 const isLoading = ref(false)
@@ -43,6 +43,7 @@ const mapRef = ref(null)
 const baseLayerRef = ref(null)
 const regionsLayerRef = ref(null)
 const regionsSourceRef = ref(null)
+const infoPopupRef = ref(null)
 
 provide('map', mapRef)
 provide('baseLayer', baseLayerRef)
@@ -50,9 +51,9 @@ provide('regionsLayer', regionsLayerRef)
 provide('regionsSource', regionsSourceRef)
 
 const highlight = useHighlight(mapRef, regionsLayerRef)
-
 provide('highlightFeature', highlight.highlightFeature)
 provide('clearHighlight', highlight.clearHighlight)
+provide('infoPopupRef', infoPopupRef)
 
 let minValue = 0
 let maxValue = 15000000
@@ -72,7 +73,7 @@ function regionStyleFunction(feature, resolution) {
       : new Stroke({ color: '#555', width: 1 }),
   })
 
-  if (resolution > 8000) {
+  if (resolution > 5000) {
     return baseStyle
   }
 
@@ -201,9 +202,6 @@ async function loadRegions(source) {
     }
 
     source.addFeatures(features)
-
-    console.log(`[MapView] Загружено регионов: ${features.length}`)
-    console.log(`[MapView] population min: ${minValue}, max: ${maxValue}`)
   } catch (err) {
     errorMessage.value = err.message
     console.error('[MapView] loadRegions error:', err)

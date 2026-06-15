@@ -31,6 +31,7 @@ const map = inject('map')
 const regionsSource = inject('regionsSource')
 const highlightFeature = inject('highlightFeature')
 const clearHighlight = inject('clearHighlight')
+const infoPopupRef = inject('infoPopupRef')
 
 const query = ref('')
 const results = ref([])
@@ -44,25 +45,18 @@ function doSearch(q) {
   const lower = q.toLowerCase().trim()
   const features = regionsSource.value.getFeatures()
 
-  console.log('[Search] всего фич в source:', features.length)
-  if (features.length > 0) {
-    console.log('[Search] props первой фичи:', features[0].getProperties())
-  }
-
   results.value = features
     .filter((f) => {
       const name = (f.get('region') || '').toLowerCase()
       return name.includes(lower)
     })
     .slice(0, 20)
-
-  console.log('[Search] найдено:', results.value.length)
 }
 
 watch(query, (newQuery) => {
   if (!newQuery || !newQuery.trim()) {
     results.value = []
-    clearHighlight()
+    if (clearHighlight) clearHighlight()
     return
   }
   doSearch(newQuery)
@@ -77,17 +71,32 @@ watch(regionsSource, (src) => {
 function goToRegion(feature) {
   if (!map.value || !feature) return
 
-  clearHighlight()
-  highlightFeature(feature)
-
   const geometry = feature.getGeometry()
-  if (geometry) {
-    map.value.getView().fit(geometry.getExtent(), {
-      padding: [100, 100, 100, 100],
-      duration: 600,
-      maxZoom: 7,
-    })
+  if (!geometry) return
+
+  const extent = geometry.getExtent()
+  const centerX = (extent[0] + extent[2]) / 2
+  const centerY = (extent[1] + extent[3]) / 2
+
+  if (infoPopupRef?.value?.close) {
+    infoPopupRef.value.close()
   }
+
+  if (clearHighlight) clearHighlight()
+
+  if (highlightFeature) highlightFeature(feature)
+
+  map.value.getView().fit(extent, {
+    padding: [100, 100, 100, 100],
+    duration: 600,
+    maxZoom: 7,
+  })
+
+  setTimeout(() => {
+    if (infoPopupRef?.value?.openForFeature) {
+      infoPopupRef.value.openForFeature(feature, [centerX, centerY])
+    }
+  }, 650)
 }
 </script>
 
@@ -152,7 +161,6 @@ function goToRegion(feature) {
   margin-top: 16px;
   max-height: 320px;
   overflow-y: auto;
-
   padding: 4px 0;
   margin-left: -4px;
   margin-right: -4px;

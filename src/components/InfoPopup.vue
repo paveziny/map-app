@@ -4,14 +4,12 @@
       <div class="popup-bg"></div>
 
       <div class="popup-content">
-        <div class="popup-close" @click="close">
+        <div class="popup-close" @click="closePopup">
           <v-icon size="16">mdi-close</v-icon>
         </div>
 
         <div class="popup-title">{{ regionName }}</div>
-
         <div class="popup-divider"></div>
-
         <div class="popup-row">
           <span class="label">Население</span>
           <span class="value">{{ formattedPopulation }}</span>
@@ -38,7 +36,6 @@ const regionName = ref('')
 const population = ref(null)
 
 let overlay = null
-let clickHandler = null
 
 const formattedPopulation = computed(() => {
   if (population.value == null) return '—'
@@ -63,7 +60,7 @@ function initPopup() {
   })
   map.value.addOverlay(overlay)
 
-  clickHandler = (event) => {
+  map.value.on('click', (event) => {
     let foundFeature = null
 
     map.value.forEachFeatureAtPixel(event.pixel, (feature, layer) => {
@@ -73,43 +70,62 @@ function initPopup() {
     })
 
     if (foundFeature) {
-      regionName.value = foundFeature.get('region') || 'Без названия'
-      population.value = Number(foundFeature.get('population')) || null
-      overlay.setPosition(event.coordinate)
-
-      if (clearHighlight) clearHighlight()
-      if (highlightFeature) highlightFeature(foundFeature)
-
-      visible.value = false
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          visible.value = true
-        })
-      })
+      showPopup(foundFeature, event.coordinate)
     } else {
-      close()
+      hidePopup()
     }
+  })
+}
+
+function showPopup(feature, coordinate) {
+  hidePopupInternal()
+
+  regionName.value = feature.get('region') || 'Без названия'
+  population.value = Number(feature.get('population')) || null
+
+  if (highlightFeature) {
+    highlightFeature(feature)
   }
 
-  map.value.on('click', clickHandler)
+  overlay.setPosition(coordinate)
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      visible.value = true
+    })
+  })
+}
+
+function hidePopupInternal() {
+  visible.value = false
+  if (overlay) {
+    overlay.setPosition(undefined)
+  }
+}
+
+function hidePopup() {
+  hidePopupInternal()
+
+  if (clearHighlight) {
+    clearHighlight()
+  }
+}
+
+function closePopup() {
+  hidePopup()
+}
+
+function openForFeature(feature, coordinate) {
+  showPopup(feature, coordinate)
 }
 
 function close() {
-  visible.value = false
-
-  if (clearHighlight) clearHighlight()
-
-  setTimeout(() => {
-    if (overlay && !visible.value) {
-      overlay.setPosition(undefined)
-    }
-  }, 200)
+  hidePopup()
 }
 
+defineExpose({ openForFeature, close })
+
 onBeforeUnmount(() => {
-  if (map.value && clickHandler) {
-    map.value.un('click', clickHandler)
-  }
   if (map.value && overlay) {
     map.value.removeOverlay(overlay)
   }
