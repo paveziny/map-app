@@ -1,6 +1,6 @@
 <template>
   <div class="map-wrapper">
-    <div ref="mapContainer" class="map-container"></div>
+    <div ref="mapContainer" class="map-container" />
 
     <SearchPanel />
     <LayersPanel />
@@ -9,7 +9,6 @@
     <div v-if="isLoading" class="loading-overlay">
       <v-progress-circular indeterminate color="primary" size="48" />
     </div>
-
     <div v-if="errorMessage" class="error-message">
       {{ errorMessage }}
     </div>
@@ -50,39 +49,37 @@ provide('baseLayer', baseLayerRef)
 provide('regionsLayer', regionsLayerRef)
 provide('regionsSource', regionsSourceRef)
 
-const highlight = useHighlight(mapRef, regionsLayerRef)
-provide('highlightFeature', highlight.highlightFeature)
-provide('clearHighlight', highlight.clearHighlight)
+const { highlightFeature, clearHighlight } = useHighlight(mapRef, regionsLayerRef)
+provide('highlightFeature', highlightFeature)
+provide('clearHighlight', clearHighlight)
 provide('infoPopupRef', infoPopupRef)
 
-let minValue = 0
-let maxValue = 15000000
+let minPopulation = 0
+let maxPopulation = 15_000_000
 
 function regionStyleFunction(feature, resolution) {
   const props = feature.getProperties()
-  const value = Number(props.population) || 0
-  const fillColor = getColorByValue(value, minValue, maxValue)
+  const population = Number(props.population) || 0
+  const fillColor = getColorByValue(population, minPopulation, maxPopulation)
   const name = props.region || ''
   const hideText = props._hideText || false
   const hideFill = props._hideFill || false
 
-  const baseStyle = new Style({
-    fill: hideFill ? new Fill({ color: 'rgba(255, 255, 255, 0)' }) : new Fill({ color: fillColor }),
-    stroke: hideFill
-      ? new Stroke({ color: 'transparent', width: 0 })
-      : new Stroke({ color: '#555', width: 1 }),
-  })
+  const fill = hideFill
+    ? new Fill({ color: 'rgba(255, 255, 255, 0)' })
+    : new Fill({ color: fillColor })
+  const stroke = hideFill
+    ? new Stroke({ color: 'transparent', width: 0 })
+    : new Stroke({ color: '#555', width: 1 })
 
-  if (resolution > 5000) {
-    return baseStyle
-  }
+  const baseStyle = new Style({ fill, stroke })
+
+  if (resolution > 5000) return baseStyle
 
   const geometry = feature.getGeometry()
   if (!geometry) return baseStyle
 
-  const geometryType = geometry.getType()
-
-  const textStyle = new Text({
+  const text = new Text({
     text: hideText ? '' : name,
     font: '500 13px Inter, Roboto, sans-serif',
     fill: new Fill({ color: '#ffffff' }),
@@ -90,53 +87,36 @@ function regionStyleFunction(feature, resolution) {
     overflow: true,
   })
 
-  if (geometryType === 'Polygon') {
-    return new Style({
-      fill: hideFill
-        ? new Fill({ color: 'rgba(255, 255, 255, 0)' })
-        : new Fill({ color: fillColor }),
-      stroke: hideFill
-        ? new Stroke({ color: 'transparent', width: 0 })
-        : new Stroke({ color: '#555', width: 1 }),
-      text: textStyle,
-    })
+  const type = geometry.getType()
+
+  if (type === 'Polygon') {
+    return new Style({ fill, stroke, text })
   }
 
-  if (geometryType === 'MultiPolygon') {
+  if (type === 'MultiPolygon') {
     const polygons = geometry.getPolygons()
-    let largestPolygon = null
-    let largestArea = 0
-
-    polygons.forEach((polygon) => {
-      const area = polygon.getArea()
-      if (area > largestArea) {
-        largestArea = area
-        largestPolygon = polygon
+    let largest = null
+    let maxArea = 0
+    polygons.forEach((p) => {
+      const area = p.getArea()
+      if (area > maxArea) {
+        maxArea = area
+        largest = p
       }
     })
+    if (!largest) return baseStyle
 
-    if (!largestPolygon) return baseStyle
-
-    return [
-      baseStyle,
-      new Style({
-        geometry: largestPolygon.getInteriorPoint(),
-        text: textStyle,
-      }),
-    ]
+    return [baseStyle, new Style({ geometry: largest.getInteriorPoint(), text })]
   }
 
   return baseStyle
 }
 
-const googleSatelliteUrl =
-  'https://mt{0-3}.google.com/vt/lyrs=s&hl=ru&gl=ru&x={x}&y={y}&z={z}&s=Galileo'
+const satelliteUrl = 'https://mt{0-3}.google.com/vt/lyrs=s&hl=ru&gl=ru&x={x}&y={y}&z={z}&s=Galileo'
 
 onMounted(async () => {
   const googleLayer = new TileLayer({
-    source: new XYZ({
-      url: googleSatelliteUrl,
-    }),
+    source: new XYZ({ url: satelliteUrl }),
     properties: { title: 'Google Satellite', baseLayer: true },
   })
 
@@ -170,23 +150,13 @@ async function loadRegions(source) {
   errorMessage.value = ''
   try {
     const response = await fetch('/data/regions.geojson')
-
-    if (!response.ok) {
-      throw new Error(`Файл не найден: ${response.status}`)
-    }
+    if (!response.ok) throw new Error(`Файл не найден (${response.status})`)
 
     const text = await response.text()
-    if (text.trimStart().startsWith('<')) {
-      throw new Error('Сервер вернул HTML вместо JSON — проверь путь к файлу в public/data/')
-    }
+    if (text.trimStart().startsWith('<'))
+      throw new Error('Сервер вернул HTML вместо JSON — проверь путь к public/data/')
 
-    let data
-    try {
-      data = JSON.parse(text)
-    } catch (e) {
-      throw new Error('Файл повреждён - не получилось разобрать как JSON', { cause: e })
-    }
-
+    const data = JSON.parse(text)
     const features = new GeoJSON().readFeatures(data, {
       dataProjection: 'EPSG:4326',
       featureProjection: 'EPSG:3857',
@@ -197,8 +167,8 @@ async function loadRegions(source) {
       .filter((v) => !Number.isNaN(v) && v > 0)
 
     if (populations.length) {
-      minValue = Math.min(...populations)
-      maxValue = Math.max(...populations)
+      minPopulation = Math.min(...populations)
+      maxPopulation = Math.max(...populations)
     }
 
     source.addFeatures(features)
@@ -211,10 +181,8 @@ async function loadRegions(source) {
 }
 
 onBeforeUnmount(() => {
-  if (mapRef.value) {
-    mapRef.value.setTarget(null)
-    mapRef.value = null
-  }
+  mapRef.value?.setTarget(null)
+  mapRef.value = null
 })
 </script>
 
@@ -232,28 +200,27 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
-.loading-overlay {
+.loading-overlay,
+.error-message {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   z-index: $z-popup;
-  background: rgba(255, 255, 255, 0.85);
+  background: $color-bg;
   padding: $panel-padding;
   border-radius: $panel-radius;
   box-shadow: $panel-shadow;
 }
 
+.loading-overlay {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
 .error-message {
-  position: absolute;
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   background: #ffebee;
   color: #c62828;
-  padding: $panel-padding;
-  border-radius: $panel-radius;
-  box-shadow: $panel-shadow;
-  z-index: $z-popup;
 }
 </style>

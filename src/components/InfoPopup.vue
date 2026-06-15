@@ -1,23 +1,20 @@
 <template>
   <div ref="popupRef" class="popup-wrapper" :class="{ 'popup-visible': visible }">
     <div class="popup">
-      <div class="popup-bg"></div>
-
+      <div class="popup-bg" />
       <div class="popup-content">
         <div class="popup-close" @click="closePopup">
           <v-icon size="16">mdi-close</v-icon>
         </div>
-
         <div class="popup-title">{{ regionName }}</div>
-        <div class="popup-divider"></div>
+        <div class="popup-divider" />
         <div class="popup-row">
           <span class="label">Население</span>
           <span class="value">{{ formattedPopulation }}</span>
         </div>
       </div>
     </div>
-
-    <div class="popup-arrow"></div>
+    <div class="popup-arrow" />
   </div>
 </template>
 
@@ -37,21 +34,20 @@ const population = ref(null)
 
 let overlay = null
 
-const formattedPopulation = computed(() => {
-  if (population.value == null) return '—'
-  return population.value.toLocaleString('ru-RU')
-})
+const formattedPopulation = computed(() =>
+  population.value == null ? '—' : population.value.toLocaleString('ru-RU'),
+)
 
 onMounted(() => {
-  const checkMap = setInterval(() => {
+  const ready = setInterval(() => {
     if (map.value && regionsLayer.value && popupRef.value) {
-      clearInterval(checkMap)
-      initPopup()
+      clearInterval(ready)
+      setupOverlay()
     }
   }, 100)
 })
 
-function initPopup() {
+function setupOverlay() {
   overlay = new Overlay({
     element: popupRef.value,
     positioning: 'bottom-center',
@@ -61,19 +57,12 @@ function initPopup() {
   map.value.addOverlay(overlay)
 
   map.value.on('click', (event) => {
-    let foundFeature = null
-
-    map.value.forEachFeatureAtPixel(event.pixel, (feature, layer) => {
-      if (layer === regionsLayer.value && !foundFeature) {
-        foundFeature = feature
-      }
+    let feature = null
+    map.value.forEachFeatureAtPixel(event.pixel, (f, layer) => {
+      if (layer === regionsLayer.value && !feature) feature = f
     })
 
-    if (foundFeature) {
-      showPopup(foundFeature, event.coordinate)
-    } else {
-      hidePopup()
-    }
+    feature ? showPopup(feature, event.coordinate) : closePopup()
   })
 }
 
@@ -83,10 +72,7 @@ function showPopup(feature, coordinate) {
   regionName.value = feature.get('region') || 'Без названия'
   population.value = Number(feature.get('population')) || null
 
-  if (highlightFeature) {
-    highlightFeature(feature)
-  }
-
+  highlightFeature?.(feature)
   overlay.setPosition(coordinate)
 
   requestAnimationFrame(() => {
@@ -98,37 +84,21 @@ function showPopup(feature, coordinate) {
 
 function hidePopupInternal() {
   visible.value = false
-  if (overlay) {
-    overlay.setPosition(undefined)
-  }
-}
-
-function hidePopup() {
-  hidePopupInternal()
-
-  if (clearHighlight) {
-    clearHighlight()
-  }
+  overlay?.setPosition(undefined)
 }
 
 function closePopup() {
-  hidePopup()
+  hidePopupInternal()
+  clearHighlight?.()
 }
 
-function openForFeature(feature, coordinate) {
-  showPopup(feature, coordinate)
-}
-
-function close() {
-  hidePopup()
-}
+const openForFeature = (feature, coordinate) => showPopup(feature, coordinate)
+const close = () => closePopup()
 
 defineExpose({ openForFeature, close })
 
 onBeforeUnmount(() => {
-  if (map.value && overlay) {
-    map.value.removeOverlay(overlay)
-  }
+  map.value?.removeOverlay(overlay)
 })
 </script>
 
@@ -170,9 +140,8 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   background: $color-bg;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  backdrop-filter: $panel-blur;
+  border: $panel-border;
   border-radius: $panel-radius;
   z-index: 0;
 }
@@ -184,7 +153,6 @@ onBeforeUnmount(() => {
 }
 
 .popup-arrow {
-  position: relative;
   width: 0;
   height: 0;
   margin: 0 auto;
@@ -205,7 +173,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   color: #94a3b8;
   border-radius: 8px;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
   z-index: 2;
 
   &:hover {
@@ -244,7 +212,6 @@ onBeforeUnmount(() => {
   .label {
     font-size: 13px;
     color: #64748b;
-    flex-shrink: 0;
     font-weight: 400;
   }
 

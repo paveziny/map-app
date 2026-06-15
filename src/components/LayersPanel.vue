@@ -6,15 +6,11 @@
       v-for="layer in layers"
       :key="layer.id"
       class="layer-row"
-      :class="{ 'layer-hidden': !layer.visible }"
+      :class="{ 'is-hidden': !layer.visible }"
     >
       <div class="layer-header">
-        <div class="visibility-toggle-wrapper" @click="toggleVisibility(layer)">
-          <v-icon
-            :icon="layer.visible ? 'mdi-eye' : 'mdi-eye-off'"
-            size="small"
-            class="visibility-toggle"
-          />
+        <div class="eye-btn" @click="toggleLayer(layer)">
+          <v-icon :icon="layer.visible ? 'mdi-eye' : 'mdi-eye-off'" size="small" />
         </div>
         <span class="layer-title">{{ layer.title }}</span>
         <span class="opacity-value">{{ Math.round(layer.opacity * 100) }}%</span>
@@ -22,13 +18,13 @@
 
       <div class="custom-slider">
         <div class="slider-track" @click="onTrackClick($event, layer)">
-          <div class="slider-fill" :style="{ width: layer.opacity * 100 + '%' }"></div>
+          <div class="slider-fill" :style="{ width: layer.opacity * 100 + '%' }" />
           <div
             class="slider-thumb"
             :style="{ left: layer.opacity * 100 + '%' }"
-            @mousedown="onThumbMouseDown($event, layer)"
-            @touchstart="onThumbTouchStart($event, layer)"
-          ></div>
+            @mousedown="onThumbDragStart($event, layer)"
+            @touchstart="onThumbDragStart($event, layer, true)"
+          />
         </div>
         <input
           type="range"
@@ -36,7 +32,7 @@
           :max="1"
           :step="0.05"
           :value="layer.opacity"
-          @input="updateOpacity(layer, parseFloat($event.target.value))"
+          @input="setLayerOpacity(layer, $event.target.valueAsNumber)"
           class="native-slider"
         />
       </div>
@@ -51,8 +47,7 @@ const baseLayer = inject('baseLayer')
 const regionsLayer = inject('regionsLayer')
 
 const layers = ref([])
-
-let activeLayer = null
+let draggedLayer = null
 
 watch(
   [baseLayer, regionsLayer],
@@ -79,82 +74,50 @@ watch(
   { immediate: true },
 )
 
-function toggleVisibility(layer) {
+const toggleLayer = (layer) => {
   layer.visible = !layer.visible
   layer.instance.setVisible(layer.visible)
-
-  layer._animating = true
-  setTimeout(() => {
-    layer._animating = false
-  }, 300)
 }
 
-function updateOpacity(layer, value) {
+const setLayerOpacity = (layer, value) => {
   layer.opacity = value
   layer.instance.setOpacity(value)
 }
 
-function onTrackClick(event, layer) {
-  const track = event.currentTarget
-  const rect = track.getBoundingClientRect()
+const onTrackClick = (event, layer) => {
+  const rect = event.currentTarget.getBoundingClientRect()
   const ratio = (event.clientX - rect.left) / rect.width
   const value = Math.round(ratio / 0.05) * 0.05
-  const clampedValue = Math.min(1, Math.max(0, value))
-  updateOpacity(layer, clampedValue)
+  setLayerOpacity(layer, Math.min(1, Math.max(0, value)))
 }
 
-function onThumbMouseDown(event, layer) {
+const onThumbDragStart = (event, layer, isTouch = false) => {
   event.preventDefault()
-  activeLayer = layer
+  draggedLayer = layer
 
-  const onMouseMove = (e) => {
-    if (!activeLayer) return
-    const track = document.querySelector(`.custom-slider .slider-track`)
+  const move = (e) => {
+    if (!draggedLayer) return
+    const track = document.querySelector('.custom-slider .slider-track')
     if (!track) return
     const rect = track.getBoundingClientRect()
-    const ratio = (e.clientX - rect.left) / rect.width
+    const clientX = isTouch ? e.touches[0].clientX : e.clientX
+    const ratio = (clientX - rect.left) / rect.width
     const value = Math.round(ratio / 0.05) * 0.05
-    const clampedValue = Math.min(1, Math.max(0, value))
-    updateOpacity(activeLayer, clampedValue)
+    setLayerOpacity(draggedLayer, Math.min(1, Math.max(0, value)))
   }
 
-  const onMouseUp = () => {
-    activeLayer = null
-    document.removeEventListener('mousemove', onMouseMove)
-    document.removeEventListener('mouseup', onMouseUp)
+  const end = () => {
+    draggedLayer = null
+    document.removeEventListener(isTouch ? 'touchmove' : 'mousemove', move)
+    document.removeEventListener(isTouch ? 'touchend' : 'mouseup', end)
   }
 
-  document.addEventListener('mousemove', onMouseMove)
-  document.addEventListener('mouseup', onMouseUp)
-}
-
-function onThumbTouchStart(event, layer) {
-  event.preventDefault()
-  activeLayer = layer
-
-  const onTouchMove = (e) => {
-    if (!activeLayer) return
-    const track = document.querySelector(`.custom-slider .slider-track`)
-    if (!track) return
-    const rect = track.getBoundingClientRect()
-    const ratio = (e.touches[0].clientX - rect.left) / rect.width
-    const value = Math.round(ratio / 0.05) * 0.05
-    const clampedValue = Math.min(1, Math.max(0, value))
-    updateOpacity(activeLayer, clampedValue)
-  }
-
-  const onTouchEnd = () => {
-    activeLayer = null
-    document.removeEventListener('touchmove', onTouchMove)
-    document.removeEventListener('touchend', onTouchEnd)
-  }
-
-  document.addEventListener('touchmove', onTouchMove)
-  document.addEventListener('touchend', onTouchEnd)
+  document.addEventListener(isTouch ? 'touchmove' : 'mousemove', move)
+  document.addEventListener(isTouch ? 'touchend' : 'mouseup', end)
 }
 
 onBeforeUnmount(() => {
-  activeLayer = null
+  draggedLayer = null
 })
 </script>
 
@@ -168,7 +131,6 @@ onBeforeUnmount(() => {
   width: 280px;
   background: $color-bg;
   backdrop-filter: $panel-blur;
-  -webkit-backdrop-filter: $panel-blur;
   border: $panel-border;
   padding: $panel-padding;
   border-radius: $panel-radius;
@@ -186,22 +148,20 @@ onBeforeUnmount(() => {
 
 .layer-row {
   padding: 12px 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s;
 
-  & + & {
+  + .layer-row {
     border-top: 1px solid rgba(148, 163, 184, 0.2);
   }
 
-  &.layer-hidden {
+  &.is-hidden {
     .layer-title,
     .opacity-value {
       opacity: 0.4;
     }
-
     .slider-fill {
       opacity: 0.3;
     }
-
     .slider-thumb {
       background: #94a3b8;
       transform: translate(-50%, -50%) scale(0.85);
@@ -216,19 +176,22 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
 }
 
-.visibility-toggle-wrapper {
-  flex-shrink: 0;
-  cursor: pointer;
+.eye-btn {
   width: 28px;
   height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  transition: background 0.2s ease;
+  cursor: pointer;
+  color: #6b7280;
+  transition:
+    background 0.2s,
+    color 0.2s;
 
   &:hover {
     background: rgba(37, 99, 235, 0.06);
+    color: $color-primary;
   }
 
   &:active {
@@ -237,29 +200,11 @@ onBeforeUnmount(() => {
   }
 }
 
-.visibility-toggle {
-  color: #6b7280;
-  transition:
-    color 0.2s ease,
-    transform 0.3s ease,
-    opacity 0.3s ease;
-
-  .layer-hidden & {
-    color: #94a3b8;
-    opacity: 0.5;
-  }
-
-  .visibility-toggle-wrapper:hover & {
-    color: $color-primary;
-  }
-}
-
 .layer-title {
   font-size: 14px;
   font-weight: 500;
   color: $color-text;
   flex: 1;
-  transition: opacity 0.3s ease;
 }
 
 .opacity-value {
@@ -268,8 +213,6 @@ onBeforeUnmount(() => {
   color: #64748b;
   min-width: 36px;
   text-align: right;
-  font-variant-numeric: tabular-nums;
-  transition: opacity 0.3s ease;
 }
 
 .custom-slider {
@@ -277,16 +220,16 @@ onBeforeUnmount(() => {
   height: 24px;
   display: flex;
   align-items: center;
+}
 
-  .native-slider {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    cursor: pointer;
-    margin: 0;
-    z-index: 2;
-  }
+.native-slider {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  margin: 0;
+  z-index: 2;
 }
 
 .slider-track {
@@ -297,7 +240,7 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   cursor: pointer;
   z-index: 1;
-  transition: background 0.2s ease;
+  transition: background 0.2s;
 
   &:hover {
     background: rgba(148, 163, 184, 0.35);
@@ -305,16 +248,12 @@ onBeforeUnmount(() => {
 }
 
 .slider-fill {
-  position: absolute;
-  top: 0;
-  left: 0;
   height: 100%;
   background: $color-primary;
   border-radius: 4px;
   transition:
-    width 0.1s ease,
-    opacity 0.3s ease;
-  pointer-events: none;
+    width 0.1s,
+    opacity 0.3s;
 }
 
 .slider-thumb {
@@ -322,18 +261,17 @@ onBeforeUnmount(() => {
   top: 50%;
   width: 16px;
   height: 16px;
-  background: #ffffff;
+  background: #fff;
   border: 2px solid $color-primary;
   border-radius: 50%;
   transform: translate(-50%, -50%);
   cursor: grab;
-  pointer-events: auto;
-  z-index: 3;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
   transition:
-    transform 0.15s ease,
-    background 0.2s ease,
-    box-shadow 0.2s ease;
+    transform 0.15s,
+    background 0.2s,
+    box-shadow 0.2s;
+  z-index: 3;
 
   &:hover {
     transform: translate(-50%, -50%) scale(1.15);

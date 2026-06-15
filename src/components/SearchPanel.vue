@@ -1,7 +1,7 @@
 <template>
   <div class="search-panel">
     <v-text-field
-      v-model="query"
+      v-model="searchQuery"
       placeholder="Поиск региона"
       variant="outlined"
       density="compact"
@@ -12,15 +12,18 @@
     />
 
     <div v-if="results.length" class="results-list">
-      <div v-for="(item, idx) in results" :key="idx" class="result-item" @click="goToRegion(item)">
+      <div
+        v-for="(item, idx) in results"
+        :key="idx"
+        class="result-item"
+        @click="navigateToRegion(item)"
+      >
         <span class="result-name">{{ item.get('region') }}</span>
         <v-icon size="small" color="primary" class="result-icon">mdi-map-marker</v-icon>
       </div>
     </div>
 
-    <div v-else-if="query && query.length > 0 && !results.length" class="no-results-wrapper">
-      <span class="no-results">Ничего не найдено</span>
-    </div>
+    <div v-else-if="searchQuery?.trim()" class="no-results">Ничего не найдено</div>
   </div>
 </template>
 
@@ -33,58 +36,47 @@ const highlightFeature = inject('highlightFeature')
 const clearHighlight = inject('clearHighlight')
 const infoPopupRef = inject('infoPopupRef')
 
-const query = ref('')
+const searchQuery = ref('')
 const results = ref([])
 
-function doSearch(q) {
-  if (!q || !q.trim() || !regionsSource.value) {
+const filterRegions = (q) => {
+  if (!q?.trim() || !regionsSource.value) {
     results.value = []
     return
   }
 
   const lower = q.toLowerCase().trim()
   const features = regionsSource.value.getFeatures()
-
   results.value = features
-    .filter((f) => {
-      const name = (f.get('region') || '').toLowerCase()
-      return name.includes(lower)
-    })
+    .filter((f) => (f.get('region') || '').toLowerCase().includes(lower))
     .slice(0, 20)
 }
 
-watch(query, (newQuery) => {
-  if (!newQuery || !newQuery.trim()) {
+watch(searchQuery, (newQuery) => {
+  if (!newQuery?.trim()) {
     results.value = []
-    if (clearHighlight) clearHighlight()
+    clearHighlight?.()
     return
   }
-  doSearch(newQuery)
+  filterRegions(newQuery)
 })
 
 watch(regionsSource, (src) => {
-  if (src && query.value) {
-    doSearch(query.value)
-  }
+  if (src && searchQuery.value) filterRegions(searchQuery.value)
 })
 
-function goToRegion(feature) {
+const navigateToRegion = (feature) => {
   if (!map.value || !feature) return
 
   const geometry = feature.getGeometry()
   if (!geometry) return
 
   const extent = geometry.getExtent()
-  const centerX = (extent[0] + extent[2]) / 2
-  const centerY = (extent[1] + extent[3]) / 2
+  const center = [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2]
 
-  if (infoPopupRef?.value?.close) {
-    infoPopupRef.value.close()
-  }
-
-  if (clearHighlight) clearHighlight()
-
-  if (highlightFeature) highlightFeature(feature)
+  infoPopupRef?.value?.close?.()
+  clearHighlight?.()
+  highlightFeature?.(feature)
 
   map.value.getView().fit(extent, {
     padding: [100, 100, 100, 100],
@@ -93,9 +85,7 @@ function goToRegion(feature) {
   })
 
   setTimeout(() => {
-    if (infoPopupRef?.value?.openForFeature) {
-      infoPopupRef.value.openForFeature(feature, [centerX, centerY])
-    }
+    infoPopupRef?.value?.openForFeature?.(feature, center)
   }, 650)
 }
 </script>
@@ -109,10 +99,10 @@ function goToRegion(feature) {
   left: 16px;
   width: 320px;
   background: $color-bg;
-  backdrop-filter: blur(12px);
+  backdrop-filter: $panel-blur;
   padding: $panel-padding;
   border-radius: $panel-radius;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: $panel-border;
   box-shadow: $panel-shadow;
   z-index: $z-panel;
 }
@@ -135,7 +125,7 @@ function goToRegion(feature) {
     }
 
     &.v-field--focused {
-      background: #ffffff;
+      background: #fff;
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
       border-color: $color-primary;
     }
@@ -161,11 +151,9 @@ function goToRegion(feature) {
   margin-top: 16px;
   max-height: 320px;
   overflow-y: auto;
-  padding: 4px 0;
   margin-left: -4px;
   margin-right: -4px;
-  padding-left: 4px;
-  padding-right: 4px;
+  padding: 4px 4px 0;
 
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
@@ -177,22 +165,18 @@ function goToRegion(feature) {
   &::-webkit-scrollbar {
     width: 4px;
   }
-
   &::-webkit-scrollbar-track {
     background: transparent;
     margin: 8px 0;
   }
-
   &::-webkit-scrollbar-thumb {
     background: transparent;
     border-radius: 10px;
-    transition: background 0.3s ease;
   }
 
   &:hover::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.15);
   }
-
   &::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.25);
   }
@@ -206,8 +190,10 @@ function goToRegion(feature) {
   margin-bottom: 2px;
   cursor: pointer;
   border-radius: 10px;
-  transition: all 0.15s ease;
   color: #334155;
+  transition:
+    background 0.15s,
+    transform 0.15s;
   position: relative;
 
   &:hover {
@@ -216,7 +202,6 @@ function goToRegion(feature) {
     .result-name {
       color: #1e293b;
     }
-
     .result-icon {
       opacity: 1;
       transform: translateX(2px);
@@ -238,7 +223,7 @@ function goToRegion(feature) {
     background: rgba(0, 0, 0, 0.04);
   }
 
-  &:hover:not(:last-child)::after {
+  &:hover::after {
     background: transparent;
   }
 }
@@ -250,26 +235,22 @@ function goToRegion(feature) {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-right: 12px;
-  transition: color 0.15s ease;
+  transition: color 0.15s;
 }
 
 .result-icon {
   opacity: 0.4;
   flex-shrink: 0;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
 }
 
-.no-results-wrapper {
+.no-results {
   margin-top: 16px;
   padding: 16px;
   background: rgba(241, 245, 249, 0.6);
   border-radius: 12px;
   text-align: center;
-}
-
-.no-results {
   font-size: 13px;
   color: #64748b;
-  font-weight: 400;
 }
 </style>
